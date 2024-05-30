@@ -1,0 +1,7 @@
+name: ec2-nginx-server
+runtime: go
+description: A minimal ec2 server that runs nginx
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: aws-go
