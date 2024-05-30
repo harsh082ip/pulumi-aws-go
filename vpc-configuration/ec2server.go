@@ -5,18 +5,11 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
-/*
-In this, we're writing a simple pulumi code to create a ec2 instance and then start a nginx
-server using userdata
-*/
-func main() {
-	pulumi.Run(CreateEc2Server)
-}
-
-func CreateEc2Server(ctx *pulumi.Context) error {
+func CreateEc2ServerWithNginx(ctx *pulumi.Context, publicSubnetID pulumi.IDOutput, vpcID pulumi.IDOutput) (*ec2.Instance, error) {
 
 	// Security-group-conf
 	sgArgs := &ec2.SecurityGroupArgs{
+		VpcId: vpcID,
 		//ingress
 		Ingress: ec2.SecurityGroupIngressArray{
 			ec2.SecurityGroupIngressArgs{
@@ -40,7 +33,7 @@ func CreateEc2Server(ctx *pulumi.Context) error {
 	// create sg
 	sg, err := ec2.NewSecurityGroup(ctx, "nginx-sg", sgArgs)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// key-pair
@@ -48,7 +41,7 @@ func CreateEc2Server(ctx *pulumi.Context) error {
 		PublicKey: pulumi.String("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCTRXP2AfM1mNR0XSM7KhDTDpAwAbG4Hxlhfx4ahV86h4JI4Kn7nVOvscNGgfqaZr2lIio6y+A30IKASrIQttI9pm/4KIPzh2uGSuedO4HDWaiwWMkXLXeymQm+qYlWbGBvz0CZyoHeHpvbXl0TZAEaW6YSIiAzaicI9vUn+lOVjOst+/gyconivI93XggRHSQXkdr+Lx6LU4hgRTS0/FbD7bsZIjaSOSF63tLX6MD9nck0Amk2sPydOfBYVuOhaW9Lqn2Nb0VkL/q2eyYyycoWyexSvVW7idJ/7sRMFzU0eVrDO2ZkoE3wUa/EsLjen1Qyjm+5lB3knolUcSfllFdUOftuGsf/JU6YtzeZ6ptSiGPngSg9ix2gma3L0kgsPll0owoMgZy+nNgiaN7vrEm1Pf3Uc+3tVE0XZtVAhchYrsLdHgdb2c07dvm736sl9143Dhjt3DUzUluN1bao+UXnBLfvlJ173R0NmbV5VgVMV7u8qJ1WbY4IFOu9OFbJdkE= nightshade@cloud1"),
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// instance conf
@@ -56,6 +49,7 @@ func CreateEc2Server(ctx *pulumi.Context) error {
 		Ami:                 pulumi.String("ami-0f58b397bc5c1f2e8"),
 		InstanceType:        pulumi.String("t2.micro"),
 		VpcSecurityGroupIds: pulumi.StringArray{sg.ID()},
+		SubnetId:            publicSubnetID,
 		KeyName:             kp.KeyName,
 		UserData:            pulumi.String("#!/bin/bash\nsudo apt-get update\nsudo apt-get install -y nginx"),
 		Tags: pulumi.StringMap{
@@ -66,12 +60,8 @@ func CreateEc2Server(ctx *pulumi.Context) error {
 	// create the instance, and start the server
 	nginxServer, err := ec2.NewInstance(ctx, "nginx-server", instanceArgs)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	// export details
-	ctx.Export("publicIP", nginxServer.PublicIp)
-	ctx.Export("publicDNS", nginxServer.PublicDns)
-
-	return nil
+	return nginxServer, nil
 }
